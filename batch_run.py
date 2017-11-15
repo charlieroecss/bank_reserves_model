@@ -1,3 +1,24 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Nov  2 15:15:04 2017
+
+@author: charlie roe 
+"""
+
+"""
+The following code was adapted from the Bank Reserves model included in Netlogo
+Model information can be found at: http://ccl.northwestern.edu/netlogo/models/BankReserves
+Accessed on: November 2, 2017
+Author of NetLogo code:
+    Wilensky, U. (1998). NetLogo Bank Reserves model. 
+    http://ccl.northwestern.edu/netlogo/models/BankReserves. 
+    Center for Connected Learning and Computer-Based Modeling, 
+    Northwestern University, Evanston, IL.
+"""
+
+"""***************************************************************************"""
+
 """
 This version of the model has a BatchRunner at the bottom. This
 is for collecting data on parameter sweeps. It is not meant to
@@ -15,6 +36,7 @@ every step of every run.
 """
 
 from bank_reserves.agents import Bank, Person
+import itertools
 from mesa import Model
 from mesa.batchrunner import BatchRunner
 from mesa.space import MultiGrid
@@ -24,21 +46,21 @@ import numpy as np
 import pandas as pd
 import random
 
-#for a Mesa DataCollector
+#for datacollector
 def get_num_rich_agents(model):
     #list of rich agents
     rich_agents = [a for a in model.schedule.agents if a.savings > model.rich_threshold]
     #return number of rich agents
     return len(rich_agents)
 
-#for a Mesa DataCollector
+#for datacollector
 def get_num_poor_agents(model):
     #list of poor agents
     poor_agents = [a for a in model.schedule.agents if a.loans > 10]
     #return number of poor agents
     return len(poor_agents)
 
-#for a Mesa DataCollector
+#for datacollector
 def get_num_mid_agents(model):
     #list of middle class agents
     mid_agents = [a for a in model.schedule.agents if 
@@ -46,21 +68,21 @@ def get_num_mid_agents(model):
     #return number of middle class agents
     return len(mid_agents)
 
-#for a Mesa DataCollector
+#for datacollector
 def get_total_savings(model):
     #list of amounts of all agents' savings
     agent_savings = [a.savings for a in model.schedule.agents]
     #return the sum of agents' savings
     return np.sum(agent_savings)
 
-#for a Mesa DataCollector
+#for datacollector
 def get_total_wallets(model):
     #list of amounts of all agents' wallets 
     agent_wallets = [a.wallet for a in model.schedule.agents]
     #return the sum of all agents' wallets
     return np.sum(agent_wallets)
 
-#for a Mesa DataCollector
+#for datacollector
 def get_total_money(model):
     #sum of all agents' wallets
     wallet_money = get_total_wallets(model)
@@ -69,30 +91,38 @@ def get_total_money(model):
     #return sum of agents' wallets and savings for total money
     return wallet_money + savings_money
 
-#for a Mesa DataCollector
+#for datacollector
 def get_total_loans(model):
     #list of amounts of all agents' loans
     agent_loans = [a.loans for a in model.schedule.agents]
     #return sum of all agents' loans
     return np.sum(agent_loans)
 
-"""
-This is used in the DataCollector model_reporters to collect the
-DataCollector itself for parameter sweeps. The result will be a DataCollector
-object.
-"""
-def batch_run_data(model):
-    return model.datacollector
+#for datacollector
+def track_params(model):
+    return (model.init_people,
+            model.rich_threshold,
+            model.reserve_percent)
+
+#for datacollector   
+def track_run(model):
+    return model.uid
+
 
 class BankReservesModel(Model):
+    #id generator to track run number in batch run data
+    id_gen = itertools.count(1)
     
-    grid_h = 20 #grid height
-    grid_w = 20 #grid width
+    #grid height
+    grid_h = 20
+    #grid width
+    grid_w = 20
     
     """init parameters "init_people", "rich_threshold", and "reserve_percent"
        are all UserSettableParameters"""
     def __init__(self, height=grid_h, width=grid_w, init_people=2, rich_threshold=10,
                  reserve_percent=50,):
+        self.uid = next(self.id_gen)
         self.height = height
         self.width = width
         self.init_people = init_people
@@ -110,7 +140,8 @@ class BankReservesModel(Model):
                                  "Wallets":get_total_wallets,
                                  "Money":get_total_money,
                                  "Loans":get_total_loans,
-                                 "Batch":batch_run_data},
+                                 "Model Params":track_params,
+                                 "Run":track_run},
                 agent_reporters={"Wealth":lambda x: x.wealth})
         
         #create a single bank for the model
@@ -141,24 +172,24 @@ class BankReservesModel(Model):
         for i in range(self.run_time):
             self.step()
 
-
+#parameter lists for each parameter to be tested in batch run
 br_params = {"init_people":[25, 100, 150, 200],
              "rich_threshold":[5, 10, 15, 20],
              "reserve_percent":[0, 50, 100]}
 
-bank_reserves_batch_runner = BatchRunner(BankReservesModel, br_params,
+br = BatchRunner(BankReservesModel, br_params,
                                          iterations=1, max_steps=1000,
-                                         model_reporters={"Batch":batch_run_data})
+                                         model_reporters={"Data Collector":lambda m: m.datacollector})
 
 if __name__ == '__main__':
-    bank_reserves_batch_runner.run_all()
-    run_data = bank_reserves_batch_runner.get_model_vars_dataframe()
-    batch_data_collector_objects = run_data["Batch"]
-    step_data = pd.DataFrame()
-    for i in range(len(batch_data_collector_objects)):
-        if isinstance(batch_data_collector_objects.iloc[i], DataCollector):
-            dco = batch_data_collector_objects.iloc[i]
-            dco_df = dco.get_model_vars_dataframe()
-            step_data = step_data.append(dco_df, ignore_index=True)
-    step_data.to_csv("BankReservesModel_Step_Data.csv")
-    
+    br.run_all()
+    br_df = br.get_model_vars_dataframe()
+    br_step_data = pd.DataFrame()
+    for i in range(len(br_df["Data Collector"])):
+        if isinstance(br_df["Data Collector"][i], DataCollector):
+            i_run_data = br_df["Data Collector"][i].get_model_vars_dataframe()
+            br_step_data = br_step_data.append(i_run_data, ignore_index=True)
+    br_step_data.to_csv("BankReservesModel_Step_Data.csv")
+               
+
+            
