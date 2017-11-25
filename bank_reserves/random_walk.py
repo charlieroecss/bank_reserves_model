@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Thu Nov  2 15:07:03 2017
 
-@author: charlie roe
-"""
+import random
+from mesa import Agent
 
 """
 Citation:
@@ -19,11 +17,8 @@ Original Author: Jackie Kazil
 Generalized behavior for random walking, one grid cell at a time.
 '''
 
-import random
 
-from mesa import Agent
-
-#subclass of Mesa Agent, which serves as parent class to Person in agents.py
+# subclass of Mesa Agent, which serves as parent class to Person in agents.py
 class RandomWalker(Agent):
     '''
     Class implementing random walker methods in a generalized manner.
@@ -34,7 +29,7 @@ class RandomWalker(Agent):
     grid = None
     x = None
     y = None
-    #use a moore neighborhood
+    # use a moore neighborhood
     moore = True
 
     def __init__(self, unique_id, pos, model, moore=True):
