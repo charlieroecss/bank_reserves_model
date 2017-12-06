@@ -132,6 +132,10 @@ class BankReservesModel(Model):
         self.datacollector.collect(self)
         # tell all the agents in the model to run their step function
         self.schedule.step()
+        # if the step count is in the list then create a data file of model state
+        if self.schedule.steps in [100, 500, 1000]:
+            model_data = self.datacollector.get_model_vars_dataframe()
+            model_data.to_csv("BankReservesModel_Step_Data_Single_Run" + str(self.schedule.steps) + ".csv")
 
     def run_model(self):
         for i in range(self.run_time):
